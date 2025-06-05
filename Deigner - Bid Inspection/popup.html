@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deigner - Bid Examiner</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Deigner - Bid Examiner</h1>
+            <p id="stats" class="status-message">Loading...</p>
+        </header>
+
+        <nav class="tab-buttons">
+            <button class="tab-button" data-tab="prebid-tab">Prebid.js</button>
+            <button class="tab-button" data-tab="tam-tab">Amazon TAM</button>
+            <button class="tab-button" data-tab="network-tab">Network Traffic</button>
+            <button class="tab-button" data-tab="targeting-tab">User Targeting</button>
+            <button class="tab-button" data-tab="ids-tab">Assigned IDs</button> </nav>
+
+        <main class="tab-content-container">
+            <div id="prebid-tab" class="tab-content"></div>
+            <div id="tam-tab" class="tab-content"></div>
+            <div id="network-tab" class="tab-content"></div>
+            <div id="targeting-tab" class="tab-content"></div>
+            <div id="ids-tab" class="tab-content"></div> </main>
+
+        <div class="controls">
+            <input type="text" id="phrase" placeholder="Count phrase in URLs (e.g., 'bid')">
+            <button id="btn-count" class="control-button secondary">Count</button>
+            <button id="btn-refresh" class="control-button primary">Refresh Data</button>
+            <button id="btn-clear" class="control-button secondary">Clear Data</button>
+        </div>
+    </div>
+
+    <template id="exportButton">
+        <button class="export-button">Export JSON</button>
+    </template>
+
+    <script src="popup.js"></script>
+</body>
+</html>

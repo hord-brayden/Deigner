@@ -1,0 +1,332 @@
+/* popup.css */
+
+:root {
+    --primary-color: #4CAF50; /* Green */
+    --primary-dark-color: #388E3C;
+    --secondary-color: #03A9F4; /* Light Blue */
+    --secondary-dark-color: #0288D1;
+    --text-color: #333;
+    --light-text-color: #666;
+    --background-color: #f9f9f9;
+    --card-background: #ffffff;
+    --border-color: #e0e0e0;
+    --shadow-light: rgba(0, 0, 0, 0.05);
+    --header-height: 50px;
+    --tab-height: 40px;
+    --control-height: 50px;
+    --font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+body {
+    font-family: var(--font-family);
+    margin: 0;
+    padding: 0;
+    width: 600px; /* Adjust width as needed */
+    min-height: 450px; /* Minimum height for better layout */
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    box-sizing: border-box;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Ensure container fills viewport height */
+    padding-bottom: 10px; /* Space for controls */
+}
+
+header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px var(--shadow-light);
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+.status-message {
+    font-size: 0.9em;
+    opacity: 0.9;
+    margin-top: 5px;
+}
+
+.error-message {
+    color: #d32f2f; /* Red */
+    background-color: #ffebee;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.no-data-message {
+    text-align: center;
+    color: var(--light-text-color);
+    padding: 20px;
+    font-style: italic;
+}
+
+nav.tab-buttons {
+    display: flex;
+    justify-content: flex-start; /* Align tabs to the left */
+    background-color: var(--card-background);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px var(--shadow-light);
+    position: sticky;
+    top: 0; /* Stick tabs to the top when scrolling */
+    z-index: 100; /* Ensure tabs are above content */
+    flex-shrink: 0;
+}
+
+.tab-button {
+    background-color: transparent;
+    border: none;
+    padding: 12px 20px;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--light-text-color);
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-button:hover:not(.active) {
+    color: var(--primary-color);
+    background-color: #f0f0f0;
+}
+
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom: 3px solid var(--primary-color);
+    font-weight: 600;
+}
+
+main.tab-content-container {
+    flex-grow: 1; /* Allow content to take available space */
+    padding: 15px 20px;
+    background-color: var(--background-color);
+    overflow-y: auto; /* Enable scrolling for content */
+}
+
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+section {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px var(--shadow-light);
+    margin-bottom: 20px;
+    padding: 20px;
+    position: relative; /* For export button positioning */
+}
+
+section h2 {
+    color: var(--primary-dark-color);
+    font-size: 1.2em;
+    margin-top: 0;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+section h3 {
+    color: var(--text-color);
+    font-size: 1.1em;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 5px;
+}
+
+section p {
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 0.85em;
+    table-layout: auto; /* Adjust column width based on content */
+}
+
+table th, table td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+table th {
+    background-color: #f0f0f0;
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap; /* Prevent headers from wrapping too much */
+}
+
+table td {
+    background-color: var(--card-background);
+}
+
+table td a {
+    color: var(--secondary-dark-color);
+    text-decoration: none;
+}
+
+table td a:hover {
+    text-decoration: underline;
+}
+
+pre {
+    background-color: #eceff1;
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto; /* Enable horizontal scrolling for code blocks */
+    font-size: 0.8em;
+    line-height: 1.4;
+    color: #444;
+}
+
+details {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+details summary {
+    padding: 10px 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background-color: #e0e0e0;
+    border-radius: 5px 5px 0 0;
+    transition: background-color 0.2s ease;
+    color: var(--text-color);
+}
+
+details summary:hover {
+    background-color: #d5d5d5;
+}
+
+details[open] summary {
+    border-bottom: 1px solid #ddd;
+    background-color: #d5d5d5;
+}
+
+.request-details {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed var(--border-color);
+}
+
+.request-details h4 {
+    margin-top: 10px;
+    margin-bottom: 5px;
+    color: var(--primary-dark-color);
+    font-size: 1em;
+}
+
+.controls {
+    display: flex;
+    gap: 10px;
+    padding: 15px 20px;
+    background-color: var(--card-background);
+    border-top: 1px solid var(--border-color);
+    box-shadow: 0 -2px 4px var(--shadow-light);
+    align-items: center;
+    flex-wrap: wrap; /* Allow controls to wrap on smaller widths */
+    flex-shrink: 0;
+}
+
+.controls input[type="text"] {
+    flex-grow: 1; /* Allow input to take available space */
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 0.9em;
+    min-width: 150px; /* Ensure input is not too small */
+}
+
+.control-button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+    white-space: nowrap; /* Prevent button text from wrapping */
+}
+
+.control-button.primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.control-button.primary:hover {
+    background-color: var(--primary-dark-color);
+}
+
+.control-button.secondary {
+    background-color: #e0e0e0;
+    color: var(--text-color);
+}
+
+.control-button.secondary:hover {
+    background-color: #d5d5d5;
+}
+
+.export-button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    margin-left: 10px;
+}
+
+.export-button:hover {
+    background-color: var(--secondary-dark-color);
+}
+
+/* Scrollbar styling for a cleaner look */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background-color);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #bbb;
+}
