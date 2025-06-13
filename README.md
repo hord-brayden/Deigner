@@ -1,4 +1,4 @@
-# 🕵️‍♂️ Deigner - The Over-Engineered Ad Inspector
+# 🕵️‍♂️ Deigner - The Over-Engineered, Under-Coded Ad Inspector
 
 A basic bid examination tool for exploring marketing calls and requests, makes a popup on the page where it's launched, and is built to inform and advise.
 
