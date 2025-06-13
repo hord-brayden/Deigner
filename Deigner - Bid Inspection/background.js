@@ -46,6 +46,7 @@ const AD_DOMAIN_PATTERNS = [
   // we can add more as we find them, and identify them as being related to our client's needs
 ];
 
+
 const capturedRequests = new Map();
 
 chrome.webRequest.onBeforeRequest.addListener(
@@ -58,7 +59,7 @@ chrome.webRequest.onBeforeRequest.addListener(
       timeStamp: details.timeStamp,
       tabId: details.tabId,
       requestHeaders: details.requestHeaders || [],
-      requestBody: null, // Will attempt to parse below
+      requestBody: null,
       responseHeaders: null,
       statusCode: null,
       statusLine: null,
@@ -70,19 +71,14 @@ chrome.webRequest.onBeforeRequest.addListener(
       if (details.requestBody.raw) {
         try {
           const decoder = new TextDecoder("utf-8");
-          const body = details.requestBody.raw
-            .map((data) => decoder.decode(data.bytes))
-            .join('');
-          req.requestBody = body;
+          req.requestBody = details.requestBody.raw.map((data) => decoder.decode(data.bytes)).join('');
         } catch (e) {
           req.requestBody = `Error decoding body: ${e.message}`;
-          console.warn("Failed to decode request body:", e);
         }
       } else if (details.requestBody.formData) {
-        // Convert FormData to a plain object for easier storage/transfer
         const formDataObj = {};
         for (const key in details.requestBody.formData) {
-            formDataObj[key] = details.requestBody.formData[key];
+          formDataObj[key] = details.requestBody.formData[key];
         }
         req.requestBody = formDataObj;
       }
@@ -112,8 +108,8 @@ chrome.webRequest.onCompleted.addListener(
     if (req) {
       req.completed = true;
       if (!req.statusCode) {
-          req.statusCode = details.statusCode;
-          req.statusLine = details.statusLine;
+        req.statusCode = details.statusCode;
+        req.statusLine = details.statusLine;
       }
     }
   },
@@ -133,21 +129,17 @@ chrome.webRequest.onErrorOccurred.addListener(
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "getNetworkAdData") {
-    const dataForTab = Array.from(capturedRequests.values()).filter(
-        req => req.tabId === message.tabId
-    );
+    const dataForTab = Array.from(capturedRequests.values()).filter(req => req.tabId === message.tabId);
     sendResponse(dataForTab);
   } else if (message.action === "clearNetworkAdData") {
     if (message.tabId) {
-        Array.from(capturedRequests.values()).forEach(req => {
-            if (req.tabId === message.tabId) {
-                capturedRequests.delete(req.requestId);
-            }
-        });
+      Array.from(capturedRequests.values()).forEach(req => {
+        if (req.tabId === message.tabId) capturedRequests.delete(req.requestId);
+      });
     } else {
-        capturedRequests.clear();
+      capturedRequests.clear();
     }
-    sendResponse({status: "cleared"});
+    sendResponse({ status: "cleared" });
   }
   return true;
 });

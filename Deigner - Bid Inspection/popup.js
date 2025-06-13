@@ -1,71 +1,218 @@
 /* global chrome */
 document.addEventListener('DOMContentLoaded', () => {
-  /* constants ------------------------------------------------------------- */
-  const COLLECT_MS = 2000;
+
+  // ------------------ THEME ------------------
+  function applyTheme(theme) {
+    document.body.classList.toggle('dark-mode', theme === 'dark');
+  }
+  chrome.storage.sync.get(['theme'], ({theme}) => { if (theme) applyTheme(theme); });
+
+  // -------------- DOM ELEMENTS ----------------
   const $stats = document.getElementById('stats');
   const tplExport = document.getElementById('exportButton').content.firstElementChild;
-
-  let activeTabId = 'prebid-tab'; // Default active tab
-
-  /* Elements for each tab */
   const $prebidTabContent = document.getElementById('prebid-tab');
   const $tamTabContent = document.getElementById('tam-tab');
   const $networkTabContent = document.getElementById('network-tab');
   const $targetingTabContent = document.getElementById('targeting-tab');
-  const $idsTabContent = document.getElementById('ids-tab'); // NEW
+  const $idsTabContent = document.getElementById('ids-tab');
+  const $settingsTabContent = document.getElementById('settings-tab');
+  const $opensinceraTabContent = document.getElementById('opensincera-tab');
+  let activeTabId = 'prebid-tab';
 
-  /* Event Listeners */
-  document.getElementById('btn-refresh').onclick = run;
-  document.getElementById('btn-clear').onclick = clearAllData;
-  document.querySelectorAll('.tab-button').forEach(button => {
-    button.onclick = (e) => switchTab(e.target.dataset.tab);
-  });
-
-  // Initial tab activation
-  switchTab(activeTabId); // Make sure the first tab is active on load
-
-  run(); // First load
-
-  /* ---------------------------------------------------------------------- */
+  // ============ MAIN DATA COLLECTION ============
   async function run() {
-    log('popup → run()');
     $stats.textContent = 'Collecting data…';
-    clearTabContents(); // Clear current tab contents for all tabs
+    clearTabContents();
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) { $stats.textContent = '❌ No active tab'; return; }
 
-    // --- Collect Prebid.js Data and Page Storage Data ---
-    // Inject and execute collector in the page's MAIN world for pbjs access and storage
+    // ----- Prebid.js and Storage -----
     chrome.scripting.executeScript(
-      { target: { tabId: tab.id }, world: 'MAIN', args: [COLLECT_MS], func: collector },
+      { target: { tabId: tab.id }, world: 'MAIN', args: [2000], func: collector },
       ([inj]) => {
         if (chrome.runtime.lastError) {
-          const m = chrome.runtime.lastError.message;
-          $prebidTabContent.innerHTML = `<p class="error-message">❌ Error collecting Prebid.js data: ${m}</p>`;
-          log('ERROR', m); return;
+          $prebidTabContent.innerHTML = `<p class="error-message">❌ Error: ${chrome.runtime.lastError.message}</p>`;
+          return;
         }
-        // inj.result will contain { pbjs: pbjsData, storage: storageData }
         renderPrebidData(inj.result);
-        // The storage data from the collector is already available here for the main tab process
-        // We'll pass it to renderAssignedIDsData along with the cookies
-        const pageOrigin = new URL(tab.url).origin;
+        // Pass to IDs tab:
         getCookiesForOrigin(tab.url).then(cookies => {
-            renderAssignedIDsData(cookies, inj.result.storage, pageOrigin);
+          renderAssignedIDsData(cookies, inj.result.storage, new URL(tab.url).origin, inj.result.pbjs.userIds || []);
         });
       }
     );
 
-    // --- Collect Network Ad Data (from background service worker) ---
-    // Pass tab.id to filter requests relevant to the current tab
+    // ----- Network Data (Background) -----
     const networkData = await chrome.runtime.sendMessage({ action: "getNetworkAdData", tabId: tab.id });
     renderNetworkAdData(networkData);
     renderTamData(networkData);
     renderTargetingData(networkData);
-
-    // Update overall stats based on combined data (network data is ready, other data will update after callbacks)
     updateOverallStats(networkData);
   }
+
+  // ============ TAB SWITCHING ============
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab-button[data-tab="${tabId}"]`).classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+    activeTabId = tabId;
+    if (tabId === "settings-tab") renderSettingsTab();
+    if (tabId === "opensincera-tab") runOpenSinceraTab();
+  }
+  // Setup tab listeners
+  document.querySelectorAll('.tab-button').forEach(button => {
+    button.onclick = (e) => switchTab(e.target.dataset.tab);
+  });
+
+  // ============ CONTROL BUTTONS ============
+  document.getElementById('btn-refresh').onclick = run;
+  document.getElementById('btn-clear').onclick = clearAllData;
+  document.getElementById('btn-count').onclick = async () => {
+    const phrase = document.getElementById('phrase').value.trim();
+    if (!phrase) { alert('Enter a phrase'); return; }
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    chrome.scripting.executeScript(
+      { target: { tabId: tab.id }, world: 'MAIN', args: [phrase], func: p => {
+        const perf = performance.getEntriesByType('resource').map(e => e.name.toLowerCase());
+        const count = perf.filter(u => u.includes(p.toLowerCase())).length;
+        return { count, total: perf.length };
+      }},
+      ([r]) => {
+        if (chrome.runtime.lastError) {
+          alert('Error: ' + chrome.runtime.lastError.message); return;
+        }
+        alert(`“${phrase}” found in ${r.result.count} of ${r.result.total} resources`);
+      }
+    );
+  };
+
+  // ============ CLEAR AND RESET =============
+  async function clearAllData() {
+    clearTabContents();
+    $stats.textContent = '(cleared)';
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab) await chrome.runtime.sendMessage({ action: "clearNetworkAdData", tabId: tab.id });
+    run();
+  }
+  function clearTabContents() {
+    $prebidTabContent.innerHTML = '';
+    $tamTabContent.innerHTML = '';
+    $networkTabContent.innerHTML = '';
+    $targetingTabContent.innerHTML = '';
+    $idsTabContent.innerHTML = '';
+    $opensinceraTabContent.innerHTML = '';
+    $settingsTabContent.innerHTML = '';
+  }
+
+  // ========== OpenSincera TAB ==========
+  async function runOpenSinceraTab() {
+    $opensinceraTabContent.innerHTML = 'Loading OpenSincera data...';
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || !tab.url) {
+      $opensinceraTabContent.innerHTML = '<p class="error-message">No active tab with a URL.</p>'; return;
+    }
+    const domain = extractRootDomain(tab.url);
+    chrome.storage.sync.get(['opensinceraApiKey'], async ({ opensinceraApiKey }) => {
+      if (!opensinceraApiKey) {
+        $opensinceraTabContent.innerHTML = `<p>Please set your OpenSincera API key in <b>Settings</b> first.</p>`; return;
+      }
+      try {
+        const resp = await fetch(`https://open.sincera.io/api/publishers?domain=${domain}`, {
+          headers: { 'Authorization': `Bearer ${opensinceraApiKey}` }
+        });
+        if (resp.status === 404) {
+          $opensinceraTabContent.innerHTML = `<p>No OpenSincera data found for <b>${domain}</b>.</p>`; return;
+        }
+        if (!resp.ok) throw new Error("OpenSincera API Error: " + resp.statusText);
+        const d = await resp.json();
+        $opensinceraTabContent.innerHTML = renderOpenSinceraPublisherSection(d);
+      } catch (e) {
+        $opensinceraTabContent.innerHTML = `<p class="error-message">OpenSincera API Error: ${e.message}</p>`;
+      }
+    });
+  }
+  function extractRootDomain(url) {
+    try {
+      const u = new URL(url);
+      const parts = u.hostname.split('.').reverse();
+      if (parts.length >= 2) return parts[1] + '.' + parts[0];
+      return u.hostname;
+    } catch { return url; }
+  }
+  function renderOpenSinceraPublisherSection(d) {
+    return `
+    <section>
+      <h2>OpenSincera Publisher Stats for <b>${d.name}</b> <span style="font-size:0.8em;font-weight:normal;">(${d.domain})</span></h2>
+      <p><em>${d.pub_description || ''}</em></p>
+      <table>
+        <tr><th>Publisher ID</th><td>${d.publisher_id}</td></tr>
+        <tr><th>Status</th><td>${d.status}</td></tr>
+        <tr><th>Primary Supply Type</th><td>${d.primary_supply_type}</td></tr>
+        <tr><th>Visit Enabled</th><td>${d.visit_enabled ? 'Yes' : 'No'}</td></tr>
+        <tr><th>Domain</th><td>${d.domain}</td></tr>
+        <tr><th>Slug</th><td>${d.slug}</td></tr>
+        <tr><th>Categories</th><td>${(d.categories || []).join(', ')}</td></tr>
+        <tr><th>Ads-to-Content Ratio</th><td>${d.avg_ads_to_content_ratio ? (d.avg_ads_to_content_ratio * 100).toFixed(2) + '%' : 'N/A'}</td></tr>
+        <tr><th>Avg. Ads in View</th><td>${d.avg_ads_in_view ?? 'N/A'}</td></tr>
+        <tr><th>Ad Refresh Rate (s)</th><td>${d.avg_ad_refresh ?? 'N/A'}</td></tr>
+        <tr><th>Total Unique GPIDs</th><td>${d.total_unique_gpids ?? 'N/A'}</td></tr>
+        <tr><th>ID Absorption Rate</th><td>${d.id_absorption_rate ? (d.id_absorption_rate * 100).toFixed(1) + '%' : 'N/A'}</td></tr>
+        <tr><th>Avg. Page Weight (MB)</th><td>${d.avg_page_weight ? d.avg_page_weight.toFixed(2) : 'N/A'}</td></tr>
+        <tr><th>Avg. CPU Time (ms)</th><td>${d.avg_cpu ? d.avg_cpu.toFixed(2) : 'N/A'}</td></tr>
+        <tr><th>Total Supply Paths</th><td>${d.total_supply_paths ?? 'N/A'}</td></tr>
+        <tr><th>Reseller Count</th><td>${d.reseller_count ?? 'N/A'}</td></tr>
+        <tr><th>Owner Domain</th><td>${d.owner_domain}</td></tr>
+        <tr><th>Last Updated</th><td>${d.updated_at ? new Date(d.updated_at).toLocaleString() : ''}</td></tr>
+      </table>
+      <p style="font-size:0.9em;color:gray;">Source: OpenSincera (beta)</p>
+    </section>
+    `;
+  }
+
+  // ============ SETTINGS TAB ===========
+  function renderSettingsTab() {
+    $settingsTabContent.innerHTML = `
+      <section>
+        <h2>Settings</h2>
+        <label>
+          <span>OpenSincera API Key:</span>
+          <input type="text" id="sinceraApiKey" placeholder="Paste API Key here" style="width:100%">
+        </label>
+        <button id="saveApiKeyBtn" class="control-button primary" style="margin-top:10px;">Save API Key</button>
+        <p id="apiKeyStatus" style="font-size:0.9em;color:gray;margin-top:5px;"></p>
+        <hr>
+        <label>
+          <span>Theme:</span>
+          <select id="themeSelect">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </section>
+    `;
+    chrome.storage.sync.get(['opensinceraApiKey', 'theme'], ({opensinceraApiKey, theme}) => {
+      if (opensinceraApiKey) document.getElementById('sinceraApiKey').value = opensinceraApiKey;
+      if (theme) document.getElementById('themeSelect').value = theme;
+    });
+    document.getElementById('saveApiKeyBtn').onclick = () => {
+      const key = document.getElementById('sinceraApiKey').value.trim();
+      chrome.storage.sync.set({opensinceraApiKey: key}, () => {
+        const el = document.getElementById('apiKeyStatus');
+        el.innerHTML = "&#10004; Saved!";
+        setTimeout(() => el.textContent = "", 1200);
+      });
+    };
+    document.getElementById('themeSelect').onchange = e => {
+      chrome.storage.sync.set({theme: e.target.value}, () => applyTheme(e.target.value));
+    };
+  }
+
+  // ============ INITIALIZE ============
+  switchTab(activeTabId);
+  run();
 
   /* ---------------------------------------------------------------------- */
   async function clearAllData() {
@@ -102,6 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector(`.tab-button[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(tabId).classList.add('active');
     activeTabId = tabId;
+    if (tabId === "settings-tab") renderSettingsTab();
+    if (tabId === "opensincera-tab") runOpenSinceraTab();
   }
 
   function updateOverallStats(networkData) {
@@ -258,39 +407,64 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* -------- render helpers for Network Ad Traffic -------------------------------------- */
   function renderNetworkAdData(networkRequests) {
-    $networkTabContent.innerHTML = '';
-    if (!networkRequests || networkRequests.length === 0) {
-      noData($networkTabContent, 'No ad-related network traffic captured for this tab. Try refreshing the page or navigating around.');
-      return;
-    }
-
-    const s = section('Raw Network Ad Traffic', networkRequests, $networkTabContent);
-    const tableRows = networkRequests.map(req => {
-      const urlDisplay = req.url.length > 100 ? req.url.substring(0, 97) + '...' : req.url;
-      const statusText = req.error ? `ERROR: ${req.error}` : (req.statusCode || 'Pending');
-      const requestBodyPreview = req.requestBody ?
-                                (typeof req.requestBody === 'string' ? req.requestBody.substring(0, 50) + '...' : JSON.stringify(req.requestBody).substring(0, 50) + '...')
-                                : 'N/A';
-      return [
-        req.type,
-        req.method,
-        `<a href="${req.url}" target="_blank">${urlDisplay}</a>`,
-        statusText,
-        req.timeStamp ? new Date(req.timeStamp).toLocaleTimeString() : 'N/A',
-        requestBodyPreview,
-        `<button class="show-details-btn" data-request-id="${req.requestId}">Details</button>`
-      ];
-    });
-
-    s.insertAdjacentHTML('beforeend', table(
-      ['Type', 'Method', 'URL', 'Status', 'Time', 'Req Body Preview', 'Actions'],
-      tableRows
-    ));
-
-    s.querySelectorAll('.show-details-btn').forEach(button => {
-      button.onclick = (e) => showNetworkRequestDetails(e.target.dataset.requestId, networkRequests, s);
-    });
+  $networkTabContent.innerHTML = '';
+  if (!networkRequests || networkRequests.length === 0) {
+    noData($networkTabContent, 'No ad-related network traffic captured for this tab. Try refreshing the page or navigating around.');
+    return;
   }
+  // Main summary table
+  const s = section('Ad-related Network Requests', null, $networkTabContent);
+  const tableRows = networkRequests.map(req => {
+    const urlDisplay = req.url.length > 80 ? req.url.substring(0, 77) + '…' : req.url;
+    return `
+      <tr>
+        <td>${req.method}</td>
+        <td><span class="type-pill">${req.type}</span></td>
+        <td style="max-width:250px;overflow-wrap:break-word;"><a href="${req.url}" target="_blank">${urlDisplay}</a></td>
+        <td>${req.statusCode || (req.error ? 'ERR' : '—')}</td>
+        <td><button class="show-details-btn" data-request-id="${req.requestId}">Show</button></td>
+      </tr>
+      <tr class="details-row" id="details-${req.requestId}" style="display:none;"><td colspan="5"></td></tr>
+    `;
+  }).join('');
+  s.insertAdjacentHTML('beforeend', `
+    <table class="modern-table">
+      <thead>
+        <tr><th>Method</th><th>Type</th><th>URL</th><th>Status</th><th>Details</th></tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `);
+
+  // Event handlers for expanding rows
+  s.querySelectorAll('.show-details-btn').forEach(btn => {
+    btn.onclick = e => {
+      const reqId = e.target.dataset.requestId;
+      const req = networkRequests.find(r => r.requestId == reqId);
+      const detailsRow = s.querySelector(`#details-${reqId}`);
+      if (detailsRow.style.display === 'none') {
+        detailsRow.style.display = '';
+        detailsRow.firstElementChild.innerHTML = `
+          <div class="details-panel">
+            <div><strong>Request Headers:</strong><pre>${req.requestHeaders?.map(h => `${h.name}: ${h.value}`).join('\n') || 'N/A'}</pre></div>
+            <div><strong>Body:</strong><pre>${formatBody(req.requestBody)}</pre></div>
+            <div><strong>Response Headers:</strong><pre>${req.responseHeaders?.map(h => `${h.name}: ${h.value}`).join('\n') || 'N/A'}</pre></div>
+            <div><strong>Error:</strong> ${req.error || 'None'}</div>
+          </div>
+        `;
+        btn.textContent = 'Hide';
+      } else {
+        detailsRow.style.display = 'none';
+        btn.textContent = 'Show';
+      }
+    };
+  });
+}
+function formatBody(body) {
+  if (!body) return 'N/A';
+  try { return JSON.stringify(typeof body === 'string' ? JSON.parse(body) : body, null, 2); }
+  catch { return typeof body === 'string' ? body : JSON.stringify(body); }
+}
 
   function showNetworkRequestDetails(requestId, networkRequests, parentSection) {
     const request = networkRequests.find(req => req.requestId === requestId);
@@ -1003,6 +1177,15 @@ document.addEventListener('DOMContentLoaded', () => {
           return new URLSearchParams();
       }
   }
+
+  document.getElementById('saveApiKeyBtn').onclick = () => {
+    const key = document.getElementById('sinceraApiKey').value.trim();
+    chrome.storage.sync.set({opensinceraApiKey: key}, () => {
+        const el = document.getElementById('apiKeyStatus');
+        el.innerHTML = "&#10004; Saved!";
+        setTimeout(() => el.textContent = "", 1200);
+    });
+};
 
   function log(...a) { console.log('🟦[Ad Transparency Inspector]', ...a); }
 }); // This closing brace is correct for the DOMContentLoaded listener.

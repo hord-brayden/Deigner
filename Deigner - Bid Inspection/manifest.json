@@ -11,7 +11,7 @@
     "webRequest",
     "declarativeNetRequest",
     "storage",
-    "cookies" 
+    "cookies"
   ],
   "icons": {
     "32": "images/icon32.png",
