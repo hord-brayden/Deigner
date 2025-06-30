@@ -75,11 +75,5 @@ MIT License (because we're brave enough to let you see our mistakes) - tell me i
 
 ## Final Notes
 
-If you find this useful, you probably work in ad tech and we're sorry. If you find bugs, they're definitely features. If you understand all the code, please explain it to us.
+If you find this useful, you probably work in ad tech and we're sorry. If you find bugs, they're definitely features. If you understand all the code, please explain it to me.
 
-Remember:
-- Keep it Metal 🤘
-- Keep it Heavy 🏋️‍♂️
-- Real Instruments 🎸
-
-_Built with ❤️ and way too many console.log statements_
